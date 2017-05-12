@@ -1,0 +1,45 @@
+DASONEMENU:
+  text_header: "DASONE $ 配置，请用 Up/Down/Left/Right 或者移动您的鼠标进行操作. F12退出 请记得保存您的修改."
+  text_footer: "状态信息请看这里"
+  menu_label: "菜单"
+
+DASONEUSER:
+  name: "DASONE 用户"
+  header_content:
+  - "设置DASONE用户密码"
+  - "默认账户: admin"
+  - "默认密码: admin"
+  - ""
+  - "为了您应用的安全性,建议使用8个字符以上的密码 "
+  - "您的密码应该同时包含大小写字母"
+  - "建议您在密码中添加特殊字符,如!@#$%^"
+  button_label:
+  - "验证"
+  - "取消"
+  - "应用"
+  defaults:
+    DASONE_ACCESS/password:
+      label: "DASONE密码"
+      tooltip: "只支持ASCII字符"
+      value: ""
+    CONFIRM_PASSWORD:
+      label: "确认密码"
+      tooltip: "只支持ASCII字符"
+      value: ""
+
+POWEROFF:
+  name: "关机"
+  header_content:
+  - "关闭DASONE主机"
+  - "请确认你已经保存你的修改"
+  - "点击下方的按钮"
+  defaults:
+    button_content:
+      type: 6
+      label: "关机"
+
+SAVEANDQUIT:
+  name: "保存与退出"
+  header_content: "在退出之前保存你的设置？"
+
+

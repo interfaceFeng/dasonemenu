@@ -1,0 +1,38 @@
+DASONEMENU:
+  text_header: ""
+  text_footer: "Status message go here"
+  menu_label: "Menu"
+
+DASONEUSER:
+  name: "DASONE User"
+  header_content:
+  - "Set DASONE User password."
+  - "Default user: admin"
+  - "Default password: admin"
+  - ""
+  - "For the better security please consider using password with "
+  - "at least 8 symbols, both upper- and lowercase letters, and "
+  - "at least one digit and special character like !@#$%^&*()_+."
+  button_label:
+  - "Check"
+  - "Cancel"
+  - "Apply"
+
+  defaults:
+    DASONE_ACCESS/password:
+      label: "DASONE password"
+      tooltip: "ASCII characters only"
+      value: ""
+    CONFIRM_PASSWORD:
+      label: "Confirm password"
+      tooltip: "ASCII characters only"
+      value: ""
+
+SAVEANDQUIT:
+  name: "Save and Quit"
+  header_content: "Save configuration before quitting?"
+
+
+
+
+
