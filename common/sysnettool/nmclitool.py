@@ -10,10 +10,10 @@ import re
 from collections import defaultdict
 
 NMCLICMD = 'sudo /usr/bin/nmcli'
-BONDDIR = 'sudo /proc/net/bonding/'
-LSPCI = 'sudo /usr/sbin/lspci'
+BONDDIR = '/proc/net/bonding/'
+LSPCI = '/usr/sbin/lspci'
 FIND = 'sudo /usr/bin/find'
-
+BRCTL = '/usr/sbin/brctl'
 
 
 class NetworkError(Exception):
@@ -61,17 +61,26 @@ def net_cmd_run(cmd, ignore_error=False):
 #     return decorator
 
 def nmcli_add_eth(eth_name, nmcli=NMCLICMD):
-    cmd = '{nmcli} connection add type ethernet con-name {con_name} ifname {ifname} ipv4.method disabled ipv6.method ignore'.format(
+    cmd = '{nmcli} connection add type ethernet con-name {con_name} ifname {ifname} ' \
+          'ipv4.method disabled ipv6.method ignore'.format(
         nmcli=nmcli,
         con_name=eth_name,
         ifname=eth_name)
     return net_cmd_run(cmd)
 
-def nmcli_add_bond(bond_name, mode, nmcli=NMCLICMD):
-    cmd = '{nmcli} connection add type bond con-name {con_name} ifname {ifname} mode {mode} ipv4.method disabled ipv6.method ignore connection.autoconnect-slaves 1'.format(
+def nmcli_add_bond(bond_name, mode='1', nmcli=NMCLICMD):
+    cmd = '{nmcli} connection add type bond con-name {con_name} ifname {ifname} mode {mode} ' \
+          'ipv4.method disabled ipv6.method ignore connection.autoconnect-slaves 1'.format(
         nmcli=nmcli,
         con_name=bond_name,
         ifname=bond_name,
+        mode=mode)
+    return net_cmd_run(cmd)
+
+def nmcli_mod_bond_mode(bond_name, mode='1', nmcli=NMCLICMD):
+    cmd = '{nmcli} connection mod {bond_name} mode {mode}'.format(
+        nmcli=nmcli,
+        bond_name=bond_name,
         mode=mode)
     return net_cmd_run(cmd)
 
@@ -124,17 +133,37 @@ def nmcli_add_br(br_name, nmcli=NMCLICMD):
 #         br_name=br_name)
 #     return net_cmd_run(cmd)
 
-def nmcli_add_ip4(dev_name, ipv4, nmcli=NMCLICMD):
-    ip_conf = ' '
-    for property, value in ipv4.items():
-        ip_conf += 'ipv4.{property} {value} '.format(
-            property=property,
-            value=value)
+def nmcli_add_ip4(dev_name, ip_infos, nmcli=NMCLICMD):
+    ip_list = []
+    route_conf = ''
+    # support the ip_infos is not list
+    if isinstance(ip_infos, dict):
+        ip_infos = [ip_infos,]
 
-    cmd = '{nmcli} connection modify {con_name} ipv4.method manual ipv6.method ignore '.format(
+    for ip_info in ip_infos:
+        for property_, value in ip_info.items():
+            if property_ == 'address':
+                ip_list.append('ipv4.{property_} {value} '.format(
+                    property_=property_,
+                    value=value))
+            elif property_ == 'gateway':
+                route_conf = 'ipv4.{property_} {value} '.format(
+                    property_=property_,
+                    value=value)
+    ip_conf = '+'.join(ip_list)
+
+    cmd = '{nmcli} connection modify {con_name} ipv4.method manual ipv6.method ignore {ip_conf} {route_conf}'.format(
+        nmcli=nmcli,
+        con_name=dev_name,
+        ip_conf=ip_conf,
+        route_conf=route_conf)
+    return net_cmd_run(cmd)
+
+
+def nmcli_flush_ip4(dev_name, nmcli=NMCLICMD):
+    cmd = cmd = '{nmcli} connection modify {con_name} ipv4.method disabled ipv6.method ignore'.format(
         nmcli=nmcli,
         con_name=dev_name)
-    cmd += ip_conf
     return net_cmd_run(cmd)
 
 
@@ -153,7 +182,7 @@ def nmcli_make_slave(master_name, slave_name, slave_type, nmcli=NMCLICMD):
     return net_cmd_run(cmd)
 
 
-def get_bond_list(bond_info_dir=BONDDIR):
+def bond_list(bond_info_dir=BONDDIR):
     return os.listdir(bond_info_dir)
 
 
@@ -166,31 +195,36 @@ def nmcli_show_dev(dev_name, nmcli=NMCLICMD, show_type='connection'):
 
 
 def rebuild_info_dict(dev_info):
-    tmp_info_dict = defaultdict(lambda :defaultdict(dict))
-    tt = [i.split(':',1) for i in dev_info.split('\n')]
-    aa = dev_info.split('\n')
+    tmp_info_dict = {}
     # split the xx.yy to xx[yy]
-    for info in aa:
+    for info in dev_info.split('\n'):
+        if info == '':
+            continue
+
         info_list = info.split(':',1)
         key = info_list[0].strip()
         value = info_list[1].strip()
+        value = (value, '')[value == '--']
 
         # split 'GENERAL.DEVICE' to ['GENERAL', 'DEVICE']
         # split 'IP4.ADDRESS[1]' to ['IP4', 'ADDRESS', '1', '']
         key_list = re.split(r'[.\[\]]', key)
 
         if len(key_list) == 2 :
+            tmp_info_dict.setdefault(key_list[0], {})
             tmp_info_dict[key_list[0]][key_list[1]] = value
         elif len(key_list) == 4:
             # handle the situation
             # change 'IP4.ADDRESS[1]' to {'IP4':{'ADDRESS':{'1': ...}}}
             # tmp_dict = tmp_info_dict.setdefault(key_list[0], {})
             # tmp_dict.setdefault(key_list[1], {})
+            tmp_info_dict.setdefault(key_list[0], {key_list[1]:{}})
+            tmp_info_dict[key_list[0]].setdefault(key_list[1], {})
             tmp_info_dict[key_list[0]][key_list[1]][key_list[2]] = value
         elif len(key_list) == 1:
             tmp_info_dict[key_list[0]] = value
 
-    return dict(tmp_info_dict)
+    return tmp_info_dict
 
 
 def nmcli_dev_info(dev_name):
@@ -202,7 +236,7 @@ def nmcli_dev_info(dev_name):
     except:
         pass
 
-    stdout = dev_stdout + con_stdout
+    stdout = con_stdout + dev_stdout
     dev_info = stdout.strip()
 
     return rebuild_info_dict(dev_info)
@@ -247,6 +281,8 @@ def eth_name(id_list, find_cmd=FIND):
             find_cmd=find_cmd,
             dev_id=eth_id))
         eth_path = eth_path.split('\n', 1)[0] + '/net'
+        if not os.path.exists(eth_path):
+            continue
         name_list.extend(os.listdir(eth_path))
 
     return name_list
@@ -256,6 +292,20 @@ def eth_list():
     id_list = dev_id_list('Ethernet')
     name_list = eth_name(id_list)
     return name_list
+
+def br_list(brctl_cmd=BRCTL):
+    cmd = '{brctl_cmd} show'.format(
+        brctl_cmd=brctl_cmd)
+    _, br_list_str, _ = net_cmd_run(cmd)
+
+    br_list = br_list_str.strip().split('\n')
+    br_list = br_list[1:]
+    tmp_br_name_list = []
+    for br_info in br_list:
+        tmp_br_name = br_info.split('\t', 2)[0]
+        tmp_br_name_list.append(tmp_br_name)
+
+    return tmp_br_name_list
 
 
     # for dev_info in dev_info_list:

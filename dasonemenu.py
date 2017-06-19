@@ -40,9 +40,6 @@ class DASONESetUp(object):
         self.header = None
         self.screen = None
         self.globalsave = True
-        self.defaultsettingsfile = "%s/settings.yaml" \
-                                  % (os.path.dirname(__file__))
-        self.settingsfile = "/etc/dsMenu/astute.yaml"
         self.children = []
         self.child = None
         self.choices = []
@@ -57,7 +54,6 @@ class DASONESetUp(object):
         self.mainloop = None
         self.langtype = None
         self.is_login = False
-
         self.draw_login_screen()
         self.choices = []
 
@@ -262,9 +258,7 @@ class DASONESetUp(object):
         # begin mainloop
         self.mainloop = urwid.MainLoop(self.frame, palette, self.screen,
                                        unhandled_input=handle_extra_input)
-
         self.mainloop.run()
-
 
 
 def main(*args, **kwargs):
@@ -306,7 +300,7 @@ def main(*args, **kwargs):
 def setup(**kwargs):
     DASONESetUp(**kwargs)
 
-if '__main__' == __name__ or urwid.web_display.is_web_request():
+if '__main__' == __name__:
     setup()
 
 

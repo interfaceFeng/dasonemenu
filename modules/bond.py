@@ -4,7 +4,7 @@ import logging
 import urwid
 import common.dialog as dialog
 import common.modulehelper as modulehelper
-import common.networkhelper as networkhelper
+import common.sysnettool.systool as networkhelper
 import common.urwidwidgetwrapper as widget
 import time
 import copy
@@ -33,6 +33,7 @@ class Bond(urwid.WidgetWrap):
         if len(self.bond_list) > 0:
             self.activebond_name = self.bond_list[0]
         else:
+            # only used to avoid index error
             self.activebond_name = 'bond'
         # eth info in active bond
         self.active_bond_eth_inuse = []
@@ -59,10 +60,14 @@ class Bond(urwid.WidgetWrap):
                               "value": self.activebond_name},
                 "IP_ADDRESS": {"label": "ADDRESS",
                               "tooltip": "Manual configure IP address (example 192.168.1.2)",
-                              "value": self.bond_info[self.activebond_name]['ipv4']['address'] if len(self.bond_list) > 0 else ""},
+                              "value": self.bond_info[self.activebond_name]['ip4'][0]['address']
+                              if len(self.bond_list) > 0 and self.bond_info[self.activebond_name]['ip4']
+                              else ""},
                 "NET_MASK": {"label": "NETMASK",
                              "tooltip": "Manaual configure netmask (example 255.255.0.0)",
-                             "value": self.bond_info[self.activebond_name]['ipv4']['netmask'] if len(self.bond_list) > 0 else ""}
+                             "value": self.bond_info[self.activebond_name]['ip4'][0]['netmask']
+                             if len(self.bond_list) > 0 and self.bond_info[self.activebond_name]['ip4']
+                             else ""}
             }
 
 
@@ -70,7 +75,8 @@ class Bond(urwid.WidgetWrap):
     def bond_info_load(self):
         # edit there to get bond info
         bond_info = networkhelper.get_bond_info()
-        if bond_info is {}:
+        log.debug(bond_info)
+        if not bond_info:
             body_msg = "load bond info error, bond info is error or bond info is empty"
             msg = 'bond info is empty'
             self.parent.footer.original_widget.set_text(msg)
@@ -82,17 +88,13 @@ class Bond(urwid.WidgetWrap):
     def eth_info_load(self):
         # edit there to get bond info
         eth_info = networkhelper.get_eth_info()
-        log.debug(eth_info)
-        if eth_info is {}:
-            body_msg = "load eth devices info error, info is error or info is empty"
+        if not eth_info:
+            body_msg = "load eth info error, info is error or info is empty"
             msg = 'eth devices info is empty'
             self.parent.footer.original_widget.set_text(msg)
             log.warning(body_msg)
             return {}
         else:
-            for eth in eth_info:
-                eth_info[eth]['master'] = "" if eth_info[eth]['master'] == "--" else eth_info[eth]['master']
-                eth_info[eth]['status'] = "up" if (eth_info[eth]['status'] == "on") else eth_info[eth]['status']
             return eth_info
 
     # return a flow widget which wrap a listbox widget containing
@@ -101,11 +103,11 @@ class Bond(urwid.WidgetWrap):
         list_content = []
         msg = "press c to check your devices and press r to refresh devices info"
         for eth_inuse in active_bond_eth_inuse:
-            abstract = self.eth_info[eth_inuse]['abstract']
-            link_up = self.eth_info[eth_inuse]['status']
+            abstract = self.eth_info[eth_inuse]['mac']
+            link_up = self.eth_info[eth_inuse]['abstract']['status']
             status = True if link_up=="up" else False
-            text_slt = widget.TextSelected(["%s   "%eth_inuse,
-                                           "%s   "%abstract.ljust(20),
+            text_slt = widget.TextSelected(["%s   "%eth_inuse.ljust(9),
+                                           "mac: %s   "%abstract.ljust(20),
                                            "Link: %s"%link_up],
                                            self.parent.footer,
                                            msg, status=status)
@@ -124,7 +126,7 @@ class Bond(urwid.WidgetWrap):
         msg = "create new bond"
         edit_field = widget.TextField(
             None, 'Bond name', 10,
-            tooltip='Manual add bond, please add bond name with digit and alpha',
+            tooltip='Manual add bond, edit bond name with digit and alpha',
             default_value="",
             tool_bar = self.parent.footer
         )
@@ -149,24 +151,16 @@ class Bond(urwid.WidgetWrap):
             return False
 
         # update bond info
-        bond_info_tmp = copy.deepcopy(self.bond_info)
         bond_dic = {bond_name:{
-            'master': "",
-            'mode': '5',
-            'devs': [],
-            'ipv4': {'address': "", 'netmask': ""}
         }}
-        bond_info_tmp = dict(bond_info_tmp, **bond_dic)
-        response = networkhelper.update_bond_info(bond_info_tmp)
+        response = networkhelper.add_bond(bond_dic)
         time.sleep(0.5)
 
         if response[0] is True:
             # reload info
             self.refresh_details()
             if len(self.bond_list) == 1:
-                self.defaults["BOND_NAME"]["value"] = self.activebond_name
-                self.defaults["IP_ADDRESS"]["value"] = self.bond_info[self.activebond_name]['ipv4']['address']
-                self.defaults["NET_MASK"]["value"] = self.bond_info[self.activebond_name]['ipv4']['netmask']
+                self.update_bond_default()
             log.info("create new bond: %s"%bond_name)
             self.parent.footer.original_widget.set_text("update success")
             self.parent.refresh_screen()
@@ -184,22 +178,14 @@ class Bond(urwid.WidgetWrap):
     def del_bond(self, confirm):
         bond_name = self.activebond_name
         # update bond info
-        bond_info_tmp = copy.deepcopy(self.bond_info)
-        del bond_info_tmp[bond_name]
-        eth_info_tmp = copy.deepcopy(self.eth_info)
-        for eth in self.active_bond_eth_inuse:
-            eth_info_tmp[eth]['master'] = ""
-        response_bond = networkhelper.update_bond_info(bond_info_tmp)
-        response_eth = networkhelper.update_eth_info(eth_info_tmp)
+        response_bond = networkhelper.del_bond([bond_name])
         time.sleep(0.5)
 
-        if response_bond[0] is True and response_eth[0] is True:
+        if response_bond[0] is True :
             # reload info
             self.refresh_details()
             self.back_button.keypress((10, ), 'enter')
-            self.defaults["IP_ADDRESS"]["value"] = self.bond_info[self.activebond_name]['ipv4']['address']
-            self.defaults["NET_MASK"]["value"] = self.bond_info[self.activebond_name]['ipv4']['netmask']
-            self.defaults["BOND_NAME"]["value"] = self.activebond_name
+            self.update_bond_default()
             self.parent.footer.original_widget.set_text("update success")
             self.parent.refresh_screen()
             log.info("del bond: %s success"%bond_name)
@@ -207,7 +193,7 @@ class Bond(urwid.WidgetWrap):
         else:
             msg = 'update fail: error update bond info'
             self.parent.footer.original_widget.set_text(msg)
-            log.error("del bond: %s fail: %s"%(bond_name, response_bond[1] + '; ' + response_eth[1]))
+            log.error("del bond: %s fail: %s"%(bond_name, response_bond[1]))
             return False
 
 
@@ -218,9 +204,7 @@ class Bond(urwid.WidgetWrap):
             self.bond_eth_usable_tmp = []
             self.bond_eth_inuse_tmp = []
             self.listbox_content[2] = self._get_abstract_listbox(self.active_bond_eth_inuse)
-            self.defaults["IP_ADDRESS"]["value"] = self.bond_info[bond_name]['ipv4']['address']
-            self.defaults["NET_MASK"]["value"] = self.bond_info[bond_name]['ipv4']['netmask']
-            self.defaults["BOND_NAME"]["value"] = self.activebond_name
+            self.update_bond_default()
 
 
     # get inuse and usable eth for one bond
@@ -297,34 +281,33 @@ class Bond(urwid.WidgetWrap):
         bond_master = self.bond_info[self.activebond_name]['master']
 
         # update IP info
-        bond_info_tmp = copy.deepcopy(self.bond_info)
-        del bond_info_tmp[self.activebond_name]
+        set_tmp = set()
         bond_dic = {new_name:{
+            'device': new_name,
             'master': bond_master,
             'mode': bond_mode,
-            'devs': [],
-            'ipv4': {'address': "", 'netmask': ""}
+            'slave': {'Eth': set_tmp},
+            'ip4':[{'address': "", 'netmask': ""}]
         }}
-        bond_info_tmp = dict(bond_info_tmp, **bond_dic)
-        log.debug(bond_info_tmp)
-        bond_info_tmp[new_name]['ipv4']['address'] = ip_addr
-        bond_info_tmp[new_name]['ipv4']['netmask'] = netmask
-
+        if ip_addr:
+            bond_dic[new_name]['ip4'][0]['address'] = ip_addr
+        if netmask:
+            bond_dic[new_name]['ip4'][0]['netmask'] = netmask
+        if not ip_addr and not netmask:
+            del bond_dic[new_name]['ip4']
         # update eths for bond info
-        eth_info_tmp = copy.deepcopy(self.eth_info)
-        inuse_list = []
+        inuse_set = set()
         for inuse in self.bond_eth_inuse_tmp:
-            inuse_list.append(inuse)
-            eth_info_tmp[inuse]['master'] = new_name
-        bond_info_tmp[new_name]['devs'] = inuse_list
-        for usable in self.bond_eth_usable_tmp:
-            eth_info_tmp[usable]['master'] = ""
+            inuse_set.add(inuse)
+        if len(inuse_set) > 0:
+            bond_dic[new_name]['slave']['Eth'] = inuse_set
+        else:
+            del bond_dic[new_name]['slave']
 
-        response_bond = networkhelper.update_bond_info(bond_info_tmp)
-        response_eth = networkhelper.update_eth_info(eth_info_tmp)
-        time.sleep(0.5)
+        log.debug(bond_dic)
+        response_bond = networkhelper.update_bond_info(bond_dic)
 
-        if response_bond[0] is True and response_eth[0] is True:
+        if response_bond[0] is True:
             self.activebond_name = new_name
             self.defaults["IP_ADDRESS"]["value"] = ip_addr
             self.defaults["NET_MASK"]["value"] = netmask
@@ -336,7 +319,7 @@ class Bond(urwid.WidgetWrap):
         else:
             self.parent.footer.original_widget.set_text('update fail')
             log.error('Apply change for %s fail: %s'%(self.activebond_name,
-                                                      response_bond[1] + ';' +response_eth[1]))
+                                                      response_bond[1]))
         self.active_bond_eth_inuse = []
         self.active_bond_eth_usable = []
 
@@ -348,6 +331,15 @@ class Bond(urwid.WidgetWrap):
             inner_pos = focus[0].original_widget.focus_position
             eth_name = focus[0].contents[inner_pos].get_label().split()[0]
             dialog.display_dialog(self, urwid.Text("%s is highlight"%eth_name), 'highlight', 'esc')
+
+    def update_bond_default(self):
+        self.defaults["BOND_NAME"]["value"] = self.activebond_name
+        if len(self.bond_list) > 0 and self.bond_info[self.activebond_name]['ip4']:
+            self.defaults["IP_ADDRESS"]["value"] = self.bond_info[self.activebond_name]['ip4'][0]['address']
+            self.defaults["NET_MASK"]["value"] = self.bond_info[self.activebond_name]['ip4'][0]['netmask']
+        else :
+            self.defaults["IP_ADDRESS"]["value"] = ""
+            self.defaults["NET_MASK"]["value"] = ""
 
     def edit_bond(self, button):
         if len(self.bond_list) == 0:
