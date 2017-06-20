@@ -98,10 +98,21 @@ class ModuleHelper(object):
         return button
 
     @classmethod
+    def _create_label_widget(cls, label, default_date):
+        return urwid.Text([('important', label.ljust(20)), default_date])
+
+    @classmethod
     def _create_widget(cls, key, default_data, toolbar):
         field_type = default_data.get('type', WidgetType.TEXT_FIELD)
 
         # you can expend widget's type here
+        if field_type == WidgetType.LABEL:
+            label = default_data.get('label', '')
+            default = default_data.get('value', '')
+            return cls._create_label_widget(label, default)
+
+
+
         if field_type == WidgetType.TEXT_FIELD:
             ispassword = "PASSWORD" in key.upper()
             label = default_data.get('label', '')

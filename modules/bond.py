@@ -56,6 +56,7 @@ class Bond(urwid.WidgetWrap):
         self.defaults = \
             {
                 "BOND_NAME" :{"label": "NAME",
+                              "type": modulehelper.WidgetType.LABEL,
                               "tooltip": "Change your bond name here",
                               "value": self.activebond_name},
                 "IP_ADDRESS": {"label": "ADDRESS",
@@ -78,7 +79,7 @@ class Bond(urwid.WidgetWrap):
         log.debug(bond_info)
         if not bond_info:
             body_msg = "load bond info error, bond info is error or bond info is empty"
-            msg = 'bond info is empty'
+            msg = 'Bond info is empty'
             self.parent.footer.original_widget.set_text(msg)
             log.warning(body_msg)
             return {}
@@ -90,7 +91,7 @@ class Bond(urwid.WidgetWrap):
         eth_info = networkhelper.get_eth_info()
         if not eth_info:
             body_msg = "load eth info error, info is error or info is empty"
-            msg = 'eth devices info is empty'
+            msg = 'Eth devices info is empty'
             self.parent.footer.original_widget.set_text(msg)
             log.warning(body_msg)
             return {}
@@ -101,7 +102,7 @@ class Bond(urwid.WidgetWrap):
     # eth inuse abstract listbox
     def _get_abstract_listbox(self, active_bond_eth_inuse):
         list_content = []
-        msg = "press c to check your devices and press r to refresh devices info"
+        msg = "Press c to check devices or r to refresh info"
         for eth_inuse in active_bond_eth_inuse:
             abstract = self.eth_info[eth_inuse]['mac']
             link_up = self.eth_info[eth_inuse]['abstract']['status']
@@ -123,7 +124,7 @@ class Bond(urwid.WidgetWrap):
 
 
     def add_bond(self, button):
-        msg = "create new bond"
+        msg = "Create new bond"
         edit_field = widget.TextField(
             None, 'Bond name', 10,
             tooltip='Manual add bond, edit bond name with digit and alpha',
@@ -135,7 +136,7 @@ class Bond(urwid.WidgetWrap):
 
     def dialog_callback_add_bond(self, bond_name):
         # check name
-        format_msg = 'unusable bond'
+        format_msg = 'Unusable bond'
         if bond_name == '':
             self.parent.footer.original_widget.set_text("%s: bond name can not be empty"
                                                         % format_msg)
@@ -268,12 +269,13 @@ class Bond(urwid.WidgetWrap):
 
     def apply(self, button):
         # the code here is used to check bond info and eth info
+        self.parent.footer.original_widget.set_text("Apply change, it takes 5-10s")
+        self.parent.refresh_screen()
         if len(self.bond_eth_inuse_tmp) == 0 and\
             len(self.bond_eth_usable_tmp) == 0:
             self.bond_eth_inuse_tmp = copy.deepcopy(self.active_bond_eth_inuse)
             self.bond_eth_usable_tmp = copy.deepcopy(self.active_bond_eth_usable)
 
-        new_name = self.edits[0].original_widget.get_edit_text()
         ip_addr = self.edits[1].original_widget.get_edit_text()
         netmask = self.edits[2].original_widget.get_edit_text()
 
@@ -282,33 +284,32 @@ class Bond(urwid.WidgetWrap):
 
         # update IP info
         set_tmp = set()
-        bond_dic = {new_name:{
-            'device': new_name,
+        bond_dic = {self.activebond_name:{
+            'device': self.activebond_name,
             'master': bond_master,
             'mode': bond_mode,
             'slave': {'Eth': set_tmp},
             'ip4':[{'address': "", 'netmask': ""}]
         }}
         if ip_addr:
-            bond_dic[new_name]['ip4'][0]['address'] = ip_addr
+            bond_dic[self.activebond_name]['ip4'][0]['address'] = ip_addr
         if netmask:
-            bond_dic[new_name]['ip4'][0]['netmask'] = netmask
+            bond_dic[self.activebond_name]['ip4'][0]['netmask'] = netmask
         if not ip_addr and not netmask:
-            del bond_dic[new_name]['ip4']
+            del bond_dic[self.activebond_name]['ip4']
         # update eths for bond info
         inuse_set = set()
         for inuse in self.bond_eth_inuse_tmp:
             inuse_set.add(inuse)
         if len(inuse_set) > 0:
-            bond_dic[new_name]['slave']['Eth'] = inuse_set
+            bond_dic[self.activebond_name]['slave']['Eth'] = inuse_set
         else:
-            del bond_dic[new_name]['slave']
+            del bond_dic[self.activebond_name]['slave']
 
         log.debug(bond_dic)
         response_bond = networkhelper.update_bond_info(bond_dic)
 
         if response_bond[0] is True:
-            self.activebond_name = new_name
             self.defaults["IP_ADDRESS"]["value"] = ip_addr
             self.defaults["NET_MASK"]["value"] = netmask
             self.defaults["BOND_NAME"]["value"] = self.activebond_name
@@ -384,6 +385,8 @@ class Bond(urwid.WidgetWrap):
         self.edit_open = True
 
     def back_screen(self, button):
+        self.parent.footer.original_widget.set_text("Refresh info, it takes 5-10s")
+        self.parent.refresh_screen()
         self.screen = self.screenUI()
         self.refresh_details()
         self.parent.draw_child_screen(self.screen)
@@ -396,16 +399,20 @@ class Bond(urwid.WidgetWrap):
         self.eth_info = self.eth_info_load()
         self.bond_list = sorted(self.bond_info.keys())
         if self.activebond_name not in self.bond_list:
-            self.activebond_name = self.bond_list[0]
+            if self.bond_list:
+                self.activebond_name = self.bond_list[0]
+            else:
+                self.activebond_name = 'bond'
         self.bond_choices = widget.ChoicesGroup(self.bond_list,
                                                 default_value=self.activebond_name,
                                                 fn=self.radio_select_iface)
         # update radio button in header_content
         self.listbox_content[0] = self.bond_choices
-        self.listbox_content[0].set_focus(self.bond_list.index(self.activebond_name))
-        # update details
-        self.active_bond_eth_inuse, self.active_bond_eth_usable = self.get_bond_eth_info(self.activebond_name)
-        self.listbox_content[2] = self._get_abstract_listbox(self.active_bond_eth_inuse)
+        if self.bond_list:
+            self.listbox_content[0].set_focus(self.bond_list.index(self.activebond_name))
+            # update details
+            self.active_bond_eth_inuse, self.active_bond_eth_usable = self.get_bond_eth_info(self.activebond_name)
+            self.listbox_content[2] = self._get_abstract_listbox(self.active_bond_eth_inuse)
         self.parent.footer.original_widget.set_text("Update success")
         self.bond_eth_inuse_tmp = []
         self.bond_eth_usable_tmp = []
@@ -414,6 +421,8 @@ class Bond(urwid.WidgetWrap):
         if key == 'c':
             self.check_eth()
         if key == 'r':
+            self.parent.footer.original_widget.set_text("Refresh info, it takes 5-10s")
+            self.parent.refresh_screen()
             self.refresh_details()
         if key == 'esc' and self.edit_open:
             self.back_screen(None)

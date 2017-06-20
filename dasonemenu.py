@@ -124,14 +124,6 @@ class DASONESetUp(object):
         self.screen.draw_screen(size, self.frame.render(size))
 
 
-    def global_save(self):
-        #Runs save function for every module
-        for module, modulename in zip(self.children, self.choices):
-            #Run invisible modules. They may not have screen methods
-            module.apply(None)
-        return True, None
-
-
 
     def main(self):
         # this program use frame as the topmost widget, header and footer
