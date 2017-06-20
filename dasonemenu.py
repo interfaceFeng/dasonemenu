@@ -54,7 +54,7 @@ class DASONESetUp(object):
         self.mainloop = None
         self.langtype = None
         self.is_login = False
-        self.draw_login_screen()
+        self.main()
         self.choices = []
 
     def exit_program(self, button):
@@ -126,6 +126,21 @@ class DASONESetUp(object):
 
 
     def main(self):
+        # field which need to choose language
+        self.language_field = {
+            'text_header' : None,
+            'text_footer' : None,
+            'menu_label' : None
+        }
+
+        #language choose
+        self.language_field = LanguageType.choose_language("DASONEMENU",
+                                                           LanguageType.ENGLISH,
+                                                           language_field=self.language_field)
+
+
+        self.header = urwid.AttrMap(urwid.Text(self.language_field['text_header']), 'header')
+        self.footer = urwid.AttrMap(widget.RefreshText(self.language_field['text_footer'], container=self), 'footer')
         # this program use frame as the topmost widget, header and footer
         # play roles of the top and bottom lines of the frame
         self.children = []
@@ -133,7 +148,7 @@ class DASONESetUp(object):
         # load the modules will be used,
         # every module is one child
         # you can extend the num of modules by modify modules.__init__.py file
-        for clsobj in modules.__all__[1:]:
+        for clsobj in modules.__all__:
             modobj = clsobj(self, LanguageType.ENGLISH) # default language is chinese
             self.children.append(modobj)
 
@@ -180,30 +195,6 @@ class DASONESetUp(object):
         #topmost widget --Frame
         self.frame = urwid.Frame(urwid.AttrMap(self.listbox, 'body'),
                                  header=self.header, footer=self.footer)
-
-        # begin mainloop
-        self.mainloop.widget = self.frame
-
-    def draw_login_screen(self):
-        # field which need to choose language
-        self.language_field = {
-            'text_header' : None,
-            'text_footer' : None,
-            'menu_label' : None
-        }
-
-        #language choose
-        self.language_field = LanguageType.choose_language("DASONEMENU",
-                                                      LanguageType.ENGLISH,
-                                                      language_field=self.language_field)
-
-        login_obj = modules.__all__[0]
-        login_mod = login_obj(self, LanguageType.ENGLISH)
-        self.child = login_mod
-        self.header = urwid.AttrMap(urwid.Text(self.language_field['text_header']), 'header')
-        self.footer = urwid.AttrMap(widget.RefreshText(self.language_field['text_footer'], container=self), 'footer')
-        page = self.child.screenUI()
-        self.login_screen = urwid.AttrWrap(page, 'body')
         palette = \
             [
                 ('body', 'black', 'light gray', 'standout'),
@@ -227,14 +218,6 @@ class DASONESetUp(object):
                 ('text selected focus', 'dark cyan', 'light gray', 'bold'),
                 ('dialog', 'dark red', 'light gray', 'bold'),
             ]
-
-        # use appropriate Screen class
-        if urwid.web_display.is_web_request():
-            self.screen = urwid.web_display.Screen()
-        else:
-            self.screen = urwid.raw_display.Screen()
-
-        # handle unexpected signal
         def handle_extra_input(key):
             if key == 'f12':
                 raise urwid.ExitMainLoop()
@@ -245,12 +228,13 @@ class DASONESetUp(object):
             else:
                 self.child.handle_extra_input(key)
 
-        self.frame = urwid.Frame(urwid.AttrMap(self.login_screen, 'body'),
-                                 footer=self.footer)
+        self.screen = urwid.raw_display.Screen()
+
         # begin mainloop
         self.mainloop = urwid.MainLoop(self.frame, palette, self.screen,
                                        unhandled_input=handle_extra_input)
         self.mainloop.run()
+
 
 
 def main(*args, **kwargs):
