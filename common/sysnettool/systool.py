@@ -17,8 +17,8 @@ def exception(log_file='./test.log'):
                 return func(*args, **kwargs)
             except Exception as e:
                 with open(log_file, "a") as f:
-                    f.write(str(e))
-                return False, "Unexpected Error"
+                    f.write(repr(e))
+                return False, 'Error' + repr(e)
         return wrapper
     return mylog
 

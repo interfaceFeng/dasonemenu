@@ -1,0 +1,64 @@
+Bond:
+  bondzjj:
+    device: bondzjj
+    ip4:
+    - address: 172.168.10.2
+      netmask: 255.255.0.0
+    ip6: []
+    master: ''
+    mode: '1'
+    slave:
+      Eth: !!set
+        ens11: null
+        ens6: null
+Bridge: {}
+Eth:
+  ens10:
+    abstract:
+      status: 'on'
+    device: ens10
+    mac: 02:00:46:92:F6:07
+    master: ''
+  ens11:
+    abstract:
+      status: 'on'
+    device: ens11
+    mac: 02:00:46:92:F6:08
+    master: bondzjj
+  ens4:
+    abstract:
+      status: 'on'
+    device: ens4
+    mac: 02:00:F9:43:AF:EC
+    master: ''
+  ens5:
+    abstract:
+      status: 'on'
+    device: ens5
+    mac: 02:00:F9:43:AF:F3
+    master: ''
+  ens6:
+    abstract:
+      status: 'on'
+    device: ens6
+    mac: 02:00:F9:43:AF:EA
+    master: bondzjj
+  ens7:
+    abstract:
+      status: 'on'
+    device: ens7
+    mac: 02:00:F9:43:AF:EB
+    master: ''
+  ens8:
+    abstract:
+      status: 'on'
+    device: ens8
+    mac: 02:00:46:92:F6:05
+    master: ''
+  ens9:
+    abstract:
+      status: 'on'
+    device: ens9
+    mac: 02:00:46:92:F6:06
+    master: ''
+Gateway: {}

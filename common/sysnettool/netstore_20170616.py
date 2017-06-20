@@ -36,7 +36,7 @@ class BaseDev(object):
 
     def __init__(self, **property_dict):
         self.info = copy.deepcopy(self.property_dict)
-        self.check_dict = {'ip4': self.check_ip4_list}
+        self.check_dict = {}
         self.init_info(**property_dict)
 
     @property
@@ -55,40 +55,19 @@ class BaseDev(object):
 
     def modify(self, **kwargs):
         for dev_property, value in kwargs.items():
-            if not self.check_info(dev_property, value):
+            if self.check_info(dev_property, value):
+                if dev_property == 'device':
+                    continue
+                self.info[dev_property] = value
+            else:
                 raise ParamentError, '{value} not fit {dev_property}'.format(dev_property=dev_property,value=value)
 
-            if dev_property == 'device':
-                continue
-            self.info[dev_property] = value
-
     def get(self, dev_property):
-        if self.check_info(dev_property, None):
+        if self.check_info(dev_property):
             return copy.deepcopy(self.info[dev_property])
         else:
             raise DevExistError, '{dev_property} not exist'.format(
                 dev_property=dev_property)
-
-    def check_ip4_list(self, ip4_list):
-        if ip4_list is None:
-            # if is None ,mean that check the name of property
-            return True
-        ip4_check_dict = {'address': self.check_ip4,
-                          'netmask': self.check_ip4,
-                          'gateway': self.check_ip4}
-
-        for ip4 in ip4_list:
-            if 'address' not in ip4 or 'netmask'not in ip4:
-                return False
-
-            for ip4_property, value in ip4.items():
-                if not ip4_check_dict[ip4_property](value):
-                    return False
-
-        return True
-
-    def check_ip4(self, ip4):
-        return check_ip4(ip4)
 
     def check_info(self, dev_property, *args, **kwargs):
         # use the check_dict to check the value of dev_property
@@ -151,11 +130,7 @@ class MasterDev(BaseDev):
                     self.info['slave'][slave_type].discard(slave_name)
 
     def check_slave(self, slave_type=None, slave_name=None):
-        if slave_type is None:
-            # if is None ,mean that check the name of property
-            return True
-
-        if slave_type not in self.info['slave']:
+        if slave_type is not None and slave_type not in self.info['slave'].keys():
             return False
 
         return True
@@ -189,18 +164,6 @@ class Bond(MasterDev):
 
     def __init__(self, **property_dict):
         super(Bond, self).__init__(**property_dict)
-        self.check_dict.update({'mode': self.check_mode})
-
-    def check_mode(self, mode):
-        if mode is None:
-            # if is None ,mean that check the name of property
-            return True
-
-        if not bond_mode_convert(mode):
-            return False
-
-        return True
-
 
 
 class Bridge(MasterDev):
@@ -265,8 +228,7 @@ class DevDict(BaseDev):
             dev = self.init_dev(dev_type, dev_name, **kwargs)
 
         self.info[dev_type][dev_name] = dev
-
-        return copy.deepcopy(dev)
+        pass
 
     def get_dev(self, dev_type, dev_name):
         if not self.dev_exist(dev_type, dev_name):
@@ -279,8 +241,6 @@ class DevDict(BaseDev):
         dev = self.get_dev(dev_type, dev_name)
         dev.modify(**kwargs)
         self.info[dev_type][dev_name] = dev
-
-        return copy.deepcopy(dev)
 
     def del_dev(self, dev_type, dev_name):
         try:
@@ -323,8 +283,6 @@ class DevDict(BaseDev):
         master_dev.mod_slave(mod_method, slave_info)
         self.info[master_type][master_name] = master_dev
 
-        return master_dev
-
     def dev_list(self, dev_type):
         return self.info[dev_type].keys()
 
@@ -341,15 +299,11 @@ class DevDict(BaseDev):
 
 
 class BaseStore(object):
-    setting_file = './netsetting.yaml'
+    setting_file = './../test/netsetting.yaml'
 
     def __init__(self, setting_file=None):
         if setting_file:
             self.setting_file = setting_file
-
-        basedir = os.path.dirname(self.setting_file)
-        if not os.path.exists(basedir):
-            os.mkdir(basedir, 644)
 
     def save(self, settings):
         with file(self.setting_file, 'w') as f:
@@ -366,7 +320,6 @@ class NetInfo(object):
         # create the dev initialization dict
         self.dev_dict = None
         self.init_dev_dict()
-        self.refresh_real_bond()
         self.refresh_real_eth()
         # self.refresh_slave_list()
 
@@ -398,6 +351,7 @@ class NetInfo(object):
         preprocess_dict = {'Eth': self.refresh_real_eth}
 
         preprocess_dict.get(dev_type, lambda: True)()
+
         for dev_name in self.dev_dict.dev_list(dev_type):
             tmp_dev_info[dev_name] = self.dev_dict.get_dev(dev_type, dev_name).to_dict()
 
@@ -407,21 +361,20 @@ class NetInfo(object):
         # add bond and mod slave
         bond_type = 'Bond'
         slave_type = 'Eth'
-        # bond_info = self.init_info(bond_type, init_bond_info)
         slave_info = bond_info.pop('slave', {})
-        # if self.dev_dict.dev_exist(bond_type, bond_name):
-        #     return False, '{bond_name} alread exist'.format(bond_name=bond_name)
+        if self.dev_dict.dev_exist(bond_type, bond_name):
+            return False, '{bond_name} alread exist'.format(bond_name=bond_name)
 
         try:
             # add bond
-            bond_dev = self.dev_dict.add_dev(bond_type, bond_name, **bond_info)
-            self.hw_add_dev(bond_type, bond_name, bond_dev.get('mode'))
-            # if bond_info.get('ip4', None):
-            self.hw_add_ip4(bond_name, bond_dev.get('ip4'))
+            self.hw_add_dev(bond_type, bond_name, bond_info['mode'])
+            if bond_info.get('ip4', None):
+                self.hw_add_ip4(bond_name, bond_info['ip4'])
+            self.dev_dict.add_dev(bond_type, bond_name, **bond_info)
             self.hw_up_dev(bond_name)
 
             # add slave
-            for slave_name in slave_info.get(slave_type, []):
+            for slave_name in slave_info[slave_type]:
                 self.add_slave(bond_type, bond_name, slave_type, slave_name)
                 # self.mod_slave('add', bond_type, bond_name, slave_type, slave_name)
                 # self.hw_make_slave(bond_type, bond_name, slave_type, slave_name)
@@ -429,15 +382,16 @@ class NetInfo(object):
                 # self.dev_dict.mod_dev(slave_type, slave_name, master=bond_name)
                 # self.dev_dict.add_slave(bond_type, bond_name, slave_type, slave_name)
 
+            self.save()
+
         except Exception as e:
             # del bond
             status, message = self.del_bond(bond_name)
 
             if not status:
-                return False, repr(e) + ' ' + message
-            return False, repr(e)
+                return False, e.message + message
+            return False, e.message
 
-        self.save()
         return True, ''
 
     def del_bond(self, bond_name):
@@ -447,77 +401,157 @@ class NetInfo(object):
 
         try:
             # delete bond
-            bond_dev = self.dev_dict.del_dev(bond_type, bond_name)
-            if not bond_dev:
+            self.hw_del_dev(bond_type, bond_name)
+            if not self.dev_dict.dev_exist(bond_type, bond_name):
                 return False, '{bond_name} not exist'.format(
                     bond_name=bond_name)
-            self.hw_del_dev(bond_type, bond_name)
-            # if not self.dev_dict.dev_exist(bond_type, bond_name):
-            #     return False, '{bond_name} not exist'.format(
-            #         bond_name=bond_name)
+            bond_dev = self.dev_dict.del_dev(bond_type, bond_name)
 
             # init the slave
-            for slave_name in bond_dev.get('slave')[slave_type]:
-                self.dev_dict.mod_dev(slave_type, slave_name, master='')
+            for slave_name in bond_dev.get('slave'):
                 self.hw_del_dev(slave_type, slave_name)
                 self.hw_add_dev(slave_type, slave_name)
                 self.hw_up_dev(slave_name)
+                self.dev_dict.mod_dev(slave_type, slave_name, mater='')
 
+            self.save()
         except:
             return False, 'Error delete {bond_name}'.format(bond_name=bond_name)
 
-        self.save()
         return True, ''
 
     def update_bond(self, bond_name, bond_info):
         # update bond and slave
         bond_type = 'Bond'
         slave_type = 'Eth'
+        bond_dev = self.dev_dict.get_dev(bond_type, bond_name)
 
         def update_ip4():
             # update ip4
             if bond_dev.get('master') != '':
                 return False, 'Bond is slave, error set ip4'
-            new_bond_info = self.dev_dict.mod_dev(bond_type, bond_name, ip4=bond_info['ip4'])
-            self.hw_add_ip4(bond_name, new_bond_info.get('ip4'))
+            self.hw_add_ip4(bond_name, bond_info['ip4'])
+            self.dev_dict.mod_dev(bond_type, bond_name, ip4=bond_info['ip4'])
 
         def update_slave():
             # update slave
-            add_slave_list = set(bond_info['slave'][slave_type]) - set(bond_dev.get('slave')[slave_type])
-            del_slave_list = set(bond_dev.get('slave')[slave_type]) - set(bond_info['slave'][slave_type])
+            add_slave_list = set(bond_info['slave']) - set(bond_dev.get('slave'))
+            del_slave_list = set(bond_dev.get('slave')) - set(bond_info['slave'])
             for slave_name in add_slave_list:
                 self.add_slave(bond_type, bond_name, slave_type, slave_name)
 
             for slave_name in del_slave_list:
                 self.del_slave(bond_type, bond_name, slave_type, slave_name)
 
-        def update_mode():
-            # update mode
-            self.dev_dict.mod_dev(bond_type, bond_name, mode=bond_info['mode'])
-            self.hw_mod_bond_mode(bond_name, bond_info['mode'])
-
         try:
-            bond_dev = self.dev_dict.get_dev(bond_type, bond_name)
+            if not self.dev_dict.dev_exist('Bond', bond_name):
+                return False, '{bond_name} not exist'.format(
+                    bond_name=bond_name)
 
             update_method_dict = {'ip4': update_ip4,
-                                  'slave': update_slave,
-                                  'mode': update_mode}
+                                  'slave': update_slave}
 
             for update_type in bond_info:
                 update_method_dict.get(update_type, lambda: True)()
 
-            self.hw_up_dev(bond_name)
-
+            self.save()
         except Exception as e:
-            return False, repr(e)
+            return False, e.message
 
-        self.save()
         return True, ''
+
+    # def update_bond_info(self, bond_infos):
+    #     try:
+    #         for bond_name, bond_info in bond_infos.items():
+    #             # translate bond info
+    #             store_info = self.bond_store_translate(bond_info)
+    #             nmcli_info = self.bond_nmcli_translate(bond_info)
+    #
+    #             # create bond
+    #             nmclitool.nmcli_del_dev(bond_name)
+    #             nmclitool.nmcli_add_bond(bond_name, nmcli_info['mode'])
+    #             if self.check_ip4(nmcli_info['ip4']):
+    #                 nmclitool.nmcli_add_ip4(bond_name, nmcli_info['ip4'])
+    #                 # nmclitool.nmcli_up_dev(bond_name)
+    #                 self.add_dev('Bond', bond_name, ip4=store_info['ip4'])
+    #
+    #             # modify eth
+    #             for slave_name in store_info['slave_list']:
+    #                 nmclitool.nmcli_del_dev(slave_name)
+    #                 nmclitool.nmcli_add_eth(slave_name)
+    #                 nmclitool.nmcli_make_slave(bond_name, slave_name, 'bond')
+    #                 # nmclitool.nmcli_up_dev(slave_name)
+    #                 self.mod_dev('Eth', slave_name, master=bond_name)
+    #             # self.refresh_slave_list()
+    #         self.save()
+    #         return True, ''
+    #     except Exception as e:
+    #         return False, e.message
+    #
+    # def get_bond_info(self):
+    #     self.refresh_real_eth()
+    #     self.refresh_slave_list()
+    #     bond_info = {}
+    #     master_type = 'Bond'
+    #     for bond_name, bond_dev in self.dev_dict.get(master_type).items():
+    #         bond_info[bond_name] = self.bond_interface_translate(bond_dev)
+    #     return bond_info
+    #
+    # def get_default_gateway(self):
+    #     return self.dev_dict.get('Gateway')['gateway'].get('ip4')
+    #
+    # def get_eth_info(self):
+    #     self.refresh_real_eth()
+    #     eth_info = {}
+    #     for eth_name, eth_dev in self.dev_dict.get('Eth').items():
+    #         eth_info[eth_name] = self.eth_interface_translate(eth_dev)
+    #     return eth_info
+    #
+    # def update_eth_info(self, eth_infos):
+    #     for eth_name, eth_info in eth_infos.items():
+    #         if not self.dev_dict.check_dev('Eth', eth_name):
+    #             return -1, '{eth_name} not exist'.format(
+    #                 eth_name=eth_name)
+    #
+    #         try:
+    #             # demo
+    #             nmcli_info = nmclitool.nmcli_dev_info(eth_name)
+    #             if nmcli_info['status'] != eth_infos['status']:
+    #                 nmclitool.nmcli_status_dev(eth_name, eth_info['status'])
+    #             if nmcli_info['master'] != eth_info['master']:
+    #                 nmclitool.nmcli_make_slave(eth_info['master'], eth_name, 'bond')
+    #             self.update_eth(eth_name)
+    #             nmcli_info != nmclitool.nmcli_dev_info(eth_name)
+    #
+    #         except Exception as e:
+    #             return -2, str(e)
+
+    # def update_eth_info(self, eth_infos):
+    #     try:
+    #         for eth_name, eth_info in eth_infos.items():
+    #             eth_dev = self.dev_dict.get_dev('Eth', eth_name)
+    #             if eth_dev:
+    #                 store_info = self.eth_store_translate(eth_info)
+    #                 nmcli_info = self.eth_nmcli_translate(eth_info)
+    #
+    #                 nmclitool.nmcli_del_dev(eth_name)
+    #                 nmclitool.nmcli_add_eth(eth_name)
+    #                 if nmcli_info['master'] in self.dev_dict.get('Bond'):
+    #                     nmclitool.nmcli_make_slave(nmcli_info['master'], eth_name, 'bond')
+    #                 else:
+    #                     raise NetStoreError, '{master} not exist'.format(master=nmcli_info['master'])
+    #                 nmclitool.nmcli_status_dev(eth_name, nmcli_info['status'])
+    #                 # TODO need to handle the 'abstract'
+    #                 self.mod_dev('Eth', eth_name, master=store_info['master'], status=store_info['status'])
+    #             else:
+    #                 raise NetStoreError, '{eth_name} not exist'.format(eth_name=eth_name)
+    #         return True, ''
+    #     except Exception as e:
+    #         return False, e.message
 
     def refresh_real_eth(self):
         store_eths = set(self.dev_dict.dev_list('Eth'))
-        # real_eths = set(nmclitool.eth_list())
-        real_eths = set(self.hw_eth_list())
+        real_eths = set(nmclitool.eth_list())
 
         remove_eths = store_eths - real_eths
         add_eths = real_eths - store_eths
@@ -526,94 +560,75 @@ class NetInfo(object):
         # delete the eth that not exist in hardware
         for eth_name in remove_eths:
             # nmclitool.nmcli_del_dev(eth_name)
-            self.dev_dict.del_dev('Eth', eth_name)
             self.hw_del_dev('Eth', eth_name)
+            self.dev_dict.del_dev('Eth', eth_name)
 
         # add the eth that not exist in store
         for eth_name in add_eths:
+            # nmclitool.nmcli_del_dev(eth_name)
             self.hw_del_dev('Eth', eth_name)
+            # nmclitool.nmcli_add_eth(eth_name)
             self.hw_add_dev('Eth', eth_name)
-            eth_hw_info = self.hw_dev_info(eth_name)
-            store_info = self.eth_convert_info(eth_hw_info)
+            hw_info = self.hw_dev_info(eth_name)
+            store_info = self.eth_convert_info(hw_info)
             self.dev_dict.add_dev('Eth', eth_name, **store_info)
 
         # update the eth that exist in hardware and store
         for eth_name in update_eths:
             # update the info from nmcli
             eth_dev = self.dev_dict.get_dev('Eth', eth_name)
-            eth_hw_info = self.hw_dev_info(eth_name)
-            if eth_hw_info['GENERAL']['CON-PATH'] == '':
+            # nmcli_info = nmclitool.nmcli_dev_info(eth_name)
+            hw_info = self.hw_dev_info(eth_name)
+            if hw_info['GENERAL']['CON-PATH'] == '':
                 self.hw_add_dev('Eth', eth_name)
-            store_info = self.eth_convert_info(eth_hw_info)
+            # store_info = self.eth_nmcli_to_store(nmcli_info)
+            store_info = self.eth_convert_info(hw_info)
 
             eth_master = eth_dev.get('master')
             if eth_master != store_info['master'] and eth_master != '':
                 store_info['master'] = eth_master
+                # nmclitool.nmcli_make_slave(eth_master, eth_name, 'bond')
                 self.hw_make_slave('Bond', eth_master, 'Eth', eth_name)
 
             self.dev_dict.mod_dev('Eth', eth_name, **store_info)
 
-    def refresh_real_bond(self):
-        bond_type = 'Bond'
-        store_bonds = set(self.dev_dict.dev_list('Bond'))
-        real_bonds = set(self.hw_bond_list())
+    def refresh_real_br(self):
+        store_brs = set(self.dev_dict.dev_list('Bridge'))
+        real_brs = set(nmclitool.br_list())
 
-        # remove_bonds = store_bonds - real_bonds
-        add_bonds = store_bonds - real_bonds
-        out_bonds = real_bonds - store_bonds
-        update_bonds = real_bonds & store_bonds
+        remove_brs = real_brs - store_brs
+        add_brs = store_brs - real_brs
+        update_brs = store_brs & real_brs
 
-        for bond_name in add_bonds:
-            pass
+        # delete the br that not exist in store
+        for br_name in remove_brs:
+            nmclitool.nmcli_del_dev(br_name)
 
-        for bond_name in out_bonds:
-            bond_hw_info = self.hw_dev_info(bond_name)
-            store_info = self.bond_convert_info(bond_hw_info)
-            self.dev_dict.add_dev(bond_type, store_info['device'], **store_info)
+        # add the br that not exist in hardware
+        for br_name in add_brs:
+            br_dev = self.dev_dict.get_dev('Bridge', br_name)
+            # nmclitool_info = self.br_store_to_nmclitool(br_dev)
+            nmclitool_info = self.convert_nmcli_info(br_dev)
 
-        for bond_name in update_bonds:
-            pass
+            # nmclitool.nmcli_add_br(br_name)
+            self.hw_add_dev('Bridge', br_name)
+            nmclitool.nmcli_add_ip4(br_name, nmclitool_info['ip4'])
 
-    # TODO update refresh_real_br
-    # def refresh_real_br(self):
-    #     store_brs = set(self.dev_dict.dev_list('Bridge'))
-    #     real_brs = set(nmclitool.br_list())
-    #
-    #     remove_brs = real_brs - store_brs
-    #     add_brs = store_brs - real_brs
-    #     update_brs = store_brs & real_brs
-    #
-    #     # delete the br that not exist in store
-    #     for br_name in remove_brs:
-    #         nmclitool.nmcli_del_dev(br_name)
-    #
-    #     # add the br that not exist in hardware
-    #     for br_name in add_brs:
-    #         br_dev = self.dev_dict.get_dev('Bridge', br_name)
-    #         # nmclitool_info = self.br_store_to_nmclitool(br_dev)
-    #         nmclitool_info = self.convert_nmcli_info(br_dev)
-    #
-    #         # nmclitool.nmcli_add_br(br_name)
-    #         self.hw_add_dev('Bridge', br_name)
-    #         nmclitool.nmcli_add_ip4(br_name, nmclitool_info['ip4'])
-    #
-    #         br_slave_list = br_dev.get('slave')
-    #         for slave_name in br_slave_list:
-    #             nmclitool.nmcli_up_dev(slave_name)
-    #
-    #     # update the br that exist both of hardware and store
-    #     for br_name in update_brs:
-    #         br_dev = self.dev_dict.get_dev()
-    #         nmcli_info = nmclitool.nmcli_dev_info(br_name)
-    #
-    #         if self.compare_ip4_nmcli_store(nmcli_info, br_dev):
-    #             pass
+            br_slave_list = br_dev.get('slave')
+            for slave_name in br_slave_list:
+                nmclitool.nmcli_up_dev(slave_name)
+
+        # update the br that exist both of hardware and store
+        for br_name in update_brs:
+            br_dev = self.dev_dict.get_dev()
+            nmcli_info = nmclitool.nmcli_dev_info(br_name)
+
+            if self.compare_ip4_nmcli_store(nmcli_info, br_dev):
+                pass
 
     def add_slave(self, master_type, master_name, slave_type, slave_name):
         slave_dev = self.dev_dict.get_dev(slave_type, slave_name)
         slave_master_store = slave_dev.get('master')
-        self.dev_dict.mod_dev(slave_type, slave_name, master=master_name)
-        self.dev_dict.mod_slave('add', master_type, master_name, slave_type, slave_name)
 
         if slave_master_store == '' or slave_master_store != master_name:
             if slave_type == 'Eth' and slave_master_store != master_name:
@@ -624,41 +639,45 @@ class NetInfo(object):
             self.hw_make_slave(master_type, master_name, slave_type, slave_name)
             self.hw_up_dev(slave_name)
 
-
+        self.dev_dict.mod_dev(slave_type, slave_name, master=master_name)
+        self.dev_dict.mod_slave('add', master_type, master_name, slave_type, slave_name)
 
     def del_slave(self, master_type, master_name, slave_type, slave_name):
         slave_dev = self.dev_dict.get_dev(slave_type, slave_name)
         slave_master_store =slave_dev.get('master')
 
         if slave_master_store != master_name:
-            raise NetStoreError, 'master of slave not match'
-            # return False
+            return False
 
         self.hw_del_dev(slave_type, slave_name)
         self.hw_add_dev(slave_type, slave_name)
         self.dev_dict.mod_dev(slave_type, slave_name, master='')
         self.dev_dict.mod_slave('del', master_type, master_name, slave_type, slave_name)
 
-    # def init_info(self, dev_type, dev_info):
-    #     tmp_dev_info = copy.deepcopy(dev_info)
-    #     dev_dict = {'Eth': Eth,
-    #                 'Bond': Bond,
-    #                 'Bridge': Bridge}
+    # def mod_slave(self, mod_method, master_type, master_name, slave_type, slave_name):
+    #     slave_dev = self.dev_dict.get_dev(slave_type, slave_name)
+    #     slave_master_store = slave_dev.get('master')
     #
-    #     init_dev_info = dev_dict[dev_type].property_dict
-    #     for property_ in init_dev_info:
-    #         if init_dev_info[property_] and not tmp_dev_info.get(property_, None):
-    #             tmp_dev_info[property_] = init_dev_info[property_]
+    #     if mod_method == 'add':
+    #         if slave_master_store == '' or slave_master_store != master_name:
+    #             if slave_type == 'Eth' and slave_master_store != master_name:
+    #                 # Eth can't change from bridge-slave to bond-slave
+    #                 self.hw_del_dev(slave_type, slave_name)
+    #                 self.hw_add_dev(slave_type, slave_name)
     #
-    #     return tmp_dev_info
+    #             self.hw_make_slave(master_type, master_name, slave_type, slave_name)
+    #             self.hw_up_dev(slave_name)
+    #
+    #     elif mod_method == 'del':
+    #         if slave_master_store != master_name:
+    #             return False
+    #
+    #         self.hw_del_dev(slave_type, slave_name)
+    #         self.hw_add_dev(slave_type, slave_name)
+    #
+    #     self.dev_dict.mod_dev(slave_type, slave_name, master=master_name)
+    #     self.dev_dict.mod_slave(mod_method, master_type, master_name, slave_type, slave_name)
 
-    @staticmethod
-    def hw_eth_list():
-        return nmclitool.eth_list()
-
-    @staticmethod
-    def hw_bond_list():
-        return nmclitool.bond_list()
 
     @staticmethod
     def hw_del_dev(dev_type, dev_name):
@@ -677,26 +696,17 @@ class NetInfo(object):
         return nmclitool.nmcli_dev_info(dev_name)
 
     @staticmethod
-    def hw_mod_bond_mode(bond_name, mode):
-        return nmclitool.nmcli_mod_bond_mode(bond_name, mode)
-
-    @staticmethod
     def hw_add_ip4(dev_name, init_ip4):
         hw_ip4 = []
         for ip4 in init_ip4:
             cidr_address = ip4_netmask_2_cidr(ip4)
-            if not cidr_address:
-                continue
-            if 'gateway' in ip4 and not check_ip4(ip4['gateway']):
-                continue
-
             ip4.pop('netmask')
             ip4['address'] = cidr_address
             hw_ip4.append(ip4)
 
+        # hw_ip4 = ip4_network_2_cidr(ip4)
         try:
-            if hw_ip4:
-                nmclitool.nmcli_add_ip4(dev_name, hw_ip4)
+            nmclitool.nmcli_add_ip4(dev_name, hw_ip4)
         except Exception as e:
             nmclitool.nmcli_flush_ip4(dev_name)
             raise e
@@ -716,8 +726,6 @@ class NetInfo(object):
     @staticmethod
     def compare_ip4_nmcli_store(nmcli_info, br_dev):
         nmcli_ip4 = nmcli_info['IP4']
-        dev_ip4 = br_dev.get('ip4')
-
         # TODO compare the ip between nmcli_info and br_dev
 
     @staticmethod
@@ -741,49 +749,11 @@ class NetInfo(object):
     #
 
     @staticmethod
-    def eth_convert_info(eth_hw_info):
-        store_info = {'master': eth_hw_info.get('connection', {}).get('master',''),
-                      'mac': eth_hw_info.get('GENERAL', {}).get('HWADDR', ''),
+    def eth_convert_info(hw_info):
+        store_info = {'master': hw_info.get('connection', {}).get('master',''),
+                      'mac': hw_info.get('GENERAL', {}).get('HWADDR', ''),
                       'abstract': {}}
-        store_info['abstract']['status'] = eth_hw_info.get('WIRED-PROPERTIES', {}).get('CARRIER', '')
-
-        return store_info
-
-    @staticmethod
-    def bond_convert_info(hw_info):
-        device = ''
-        ip4 = []
-        # ip6 = []
-        mode = ''
-        master = ''
-
-        master = hw_info['connection']['master']
-
-        device = hw_info['GENERAL']['NAME']
-
-        if 'IP4' in hw_info:
-            for i, ip4_cidr in hw_info['IP4']['ADDRESS'].items():
-                if not ip4_cidr:
-                    continue
-                ip4.append(ip4_cidr_2_netmask(ip4_cidr))
-            gateway = hw_info['IP4']['GATEWAY']
-            if gateway and check_ip4(gateway):
-                ip4[0]['gateway'] = gateway
-
-        mode_options = hw_info['bond']['options']
-        for mode_option in mode_options.split(','):
-            option, value = mode_option.split('=')
-            if option == 'mode':
-                tmp_mode = bond_mode_convert(value)
-                if tmp_mode:
-                    mode = tmp_mode
-                    break
-
-        store_info = {'device': device,
-                      'ip4': ip4,
-                      # 'ip6': '',
-                      'mode': mode,
-                      'master': master}
+        store_info['abstract']['status'] = hw_info.get('WIRED-PROPERTIES', {}).get('CARRIER', '')
 
         return store_info
 
@@ -922,8 +892,8 @@ def ip4_netmask_2_cidr(init_ip):
     if not isinstance(init_ip, dict) or 'netmask' not in init_ip or 'address' not in init_ip:
         return None
 
-    address = init_ip['address']
-    netmask = init_ip['netmask']
+    address = init_ip.get('address', None)
+    netmask = init_ip.get('netmask', None)
     if not check_ip4(address) or not check_ip4(netmask):
         return None
 
@@ -941,26 +911,28 @@ def ip4_cidr_2_netmask(init_ip):
     return {'address': address,
              'netmask': cidr_2_netmask(cidr)}
 
-# def ip4_convert(init_ip):
-#     # convert between '1.1.1.1/16' and {'address': '1.1.1.1', 'netmask': '255.255.0.0'}
-#     if isinstance(init_ip, dict) and 'netmask' in init_ip and 'address' in init_ip:
-#         address = init_ip['address']
-#         netmask = init_ip['netmask']
-#         if not check_ip4(address) or not check_ip4(netmask):
-#             return None
-#
-#         return address + '/' + str(netmask_2_cidr(netmask))
-#
-#     elif isinstance(init_ip, str):
-#         address, cidr = init_ip.split('/')
-#         if not check_ip4(address) or not check_cidr(cidr):
-#             return None
-#
-#         return {'address': address,
-#                  'netmask': cidr_2_netmask(cidr)}
-#
-#     else:
-#         return None
+
+
+def ip4_convert(init_ip):
+    # convert between '1.1.1.1/16' and {'address': '1.1.1.1', 'netmask': '255.255.0.0'}
+    if isinstance(init_ip, dict) and 'netmask' in init_ip and 'address' in init_ip:
+        address = init_ip['address']
+        netmask = init_ip['netmask']
+        if not check_ip4(address) or not check_ip4(netmask):
+            return None
+
+        return address + '/' + str(netmask_2_cidr(netmask))
+
+    elif isinstance(init_ip, str):
+        address, cidr = init_ip.split('/')
+        if not check_ip4(address) or not check_cidr(cidr):
+            return None
+
+        return {'address': address,
+                 'netmask': cidr_2_netmask(cidr)}
+
+    else:
+        return None
 
 
 def check_ip4(ip4):
@@ -976,23 +948,6 @@ def check_ip4(ip4):
     except:
         return False
 
-def bond_mode_convert(bond_mode_info):
-    convert_dict = {'balance-rr': '0',
-                    'active-backup': '1',
-                    'balance-xor': '2',
-                    'broadcast': '3',
-                    '802.3ad': '4',
-                    'balance-tlb': '5',
-                    'balance-alb': '6',
-                    '0': '0',
-                    '1': '1',
-                    '2': '2',
-                    '3': '3',
-                    '4': '4',
-                    '5': '5',
-                    '6': '6'}
-
-    return convert_dict.get(bond_mode_info, None)
 
 def check_cidr(cidr):
     try:
@@ -1009,7 +964,6 @@ def netmask_2_cidr(netmask):
 
 
 def cidr_2_netmask(cidr):
-    cidr = int(cidr)
     return '.'.join([str((0xffffffff << (32 - cidr) >> i) & 0xff) for i in [24, 16, 8, 0]])
 
 # def dict_spider(init_dict, *keys):
