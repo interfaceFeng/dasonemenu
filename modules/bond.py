@@ -413,6 +413,8 @@ class Bond(urwid.WidgetWrap):
             # update details
             self.active_bond_eth_inuse, self.active_bond_eth_usable = self.get_bond_eth_info(self.activebond_name)
             self.listbox_content[2] = self._get_abstract_listbox(self.active_bond_eth_inuse)
+        else:
+            self.listbox_content[2] = self._get_abstract_listbox([])
         self.parent.footer.original_widget.set_text("Update success")
         self.bond_eth_inuse_tmp = []
         self.bond_eth_usable_tmp = []
