@@ -9,3 +9,5 @@ DEBUGFILE = "/var/log/dasonedebug.log"
 
 VERSION_FILE = "/etc/dasonemenu/version"
 SHADOW_FILE = "/etc/shadow"
+
+
