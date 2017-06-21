@@ -26,7 +26,7 @@ class LanguageType(object):
     @classmethod
     def choose_language(cls, part, language=CHINESE,
                         language_field=None):
-        stringdir = "%s/dasonemenu/strings" % \
+        stringdir = "%s/bondconfig/strings" % \
                      os.path.dirname(sys.path[0])
         log.debug(stringdir)
         language_tail = cls.tail.get(language, "_ch")
@@ -35,6 +35,7 @@ class LanguageType(object):
                                               part, language_tail)
 
         for key in language_field:
+            log.debug(strings)
             language_field[key] = strings[key]
 
         return language_field
