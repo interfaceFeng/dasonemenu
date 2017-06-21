@@ -2,7 +2,7 @@
 
 # this file display all modules' name this program may used
 # you can add extra class file to 'modules' package and edit this file
-# to extend function without change dasonemenu.py which is the basic
+# to extend function without change bondconfig.py which is the basic
 # setup file and entry of this program
 
 from bond import Bond
