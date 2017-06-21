@@ -515,8 +515,8 @@ class NetInfo(object):
         return True, ''
 
     def refresh_real_eth(self):
+        eth_type = 'Eth'
         store_eths = set(self.dev_dict.dev_list('Eth'))
-        # real_eths = set(nmclitool.eth_list())
         real_eths = set(self.hw_eth_list())
 
         remove_eths = store_eths - real_eths
@@ -526,32 +526,49 @@ class NetInfo(object):
         # delete the eth that not exist in hardware
         for eth_name in remove_eths:
             # nmclitool.nmcli_del_dev(eth_name)
-            self.dev_dict.del_dev('Eth', eth_name)
-            self.hw_del_dev('Eth', eth_name)
+            self.dev_dict.del_dev(eth_type, eth_name)
+            self.hw_del_dev(eth_type, eth_name)
 
         # add the eth that not exist in store
         for eth_name in add_eths:
-            self.hw_del_dev('Eth', eth_name)
-            self.hw_add_dev('Eth', eth_name)
             eth_hw_info = self.hw_dev_info(eth_name)
             store_info = self.eth_convert_info(eth_hw_info)
-            self.dev_dict.add_dev('Eth', eth_name, **store_info)
+            self.dev_dict.add_dev(eth_type, eth_name, **store_info)
+
+            master_name = store_info['master']
+            if master_name:
+                try:
+                    master_hw_info = self.hw_dev_info(master_name)
+                    if master_hw_info['connection']['type'] == 'bond':
+                        master_type = 'Bond'
+                    elif master_hw_info['connection']['type'] == 'bridge':
+                        master_type = 'Bridge'
+                    self.dev_dict.mod_slave('add', master_type, master_name, eth_type, eth_name)
+
+
+                except:
+                    self.hw_del_dev(eth_type, eth_name)
+                    self.hw_add_dev(eth_type, eth_name)
+            # self.hw_del_dev('Eth', eth_name)
+            # self.hw_add_dev('Eth', eth_name)
+
 
         # update the eth that exist in hardware and store
         for eth_name in update_eths:
             # update the info from nmcli
-            eth_dev = self.dev_dict.get_dev('Eth', eth_name)
+            eth_dev = self.dev_dict.get_dev(eth_type, eth_name)
             eth_hw_info = self.hw_dev_info(eth_name)
-            if eth_hw_info['GENERAL']['CON-PATH'] == '':
-                self.hw_add_dev('Eth', eth_name)
+            # if eth_hw_info['GENERAL']['CON-PATH'] == '':
+            #     self.hw_add_dev(eth_type, eth_name)
             store_info = self.eth_convert_info(eth_hw_info)
 
             eth_master = eth_dev.get('master')
-            if eth_master != store_info['master'] and eth_master != '':
-                store_info['master'] = eth_master
-                self.hw_make_slave('Bond', eth_master, 'Eth', eth_name)
+            if eth_master != store_info['master']:
+                if eth_master != '':
+                    store_info['master'] = eth_master
+                    self.hw_make_slave('Bond', eth_master, eth_type, eth_name)
 
-            self.dev_dict.mod_dev('Eth', eth_name, **store_info)
+            self.dev_dict.mod_dev(eth_type, eth_name, **store_info)
 
     def refresh_real_bond(self):
         bond_type = 'Bond'
@@ -564,7 +581,10 @@ class NetInfo(object):
         update_bonds = real_bonds & store_bonds
 
         for bond_name in add_bonds:
-            pass
+            bond_dev = self.dev_dict.get_dev(bond_type, bond_name)
+            self.hw_add_dev(bond_type, bond_name, bond_dev.get('mode'))
+            self.hw_add_ip4(bond_name, bond_dev.get('ip4'))
+            self.hw_up_dev(bond_name)
 
         for bond_name in out_bonds:
             bond_hw_info = self.hw_dev_info(bond_name)
@@ -615,15 +635,16 @@ class NetInfo(object):
         self.dev_dict.mod_dev(slave_type, slave_name, master=master_name)
         self.dev_dict.mod_slave('add', master_type, master_name, slave_type, slave_name)
 
-        if slave_master_store == '' or slave_master_store != master_name:
-            if slave_type == 'Eth' and slave_master_store != master_name:
+        # if slave_master_store == '' or slave_master_store != master_name:
+        #     if slave_type == 'Eth' and slave_master_store != master_name:
+        if slave_master_store != master_name:
+            if slave_type == 'Eth':
                 # Eth can't change from bridge-slave to bond-slave
                 self.hw_del_dev(slave_type, slave_name)
                 self.hw_add_dev(slave_type, slave_name)
 
             self.hw_make_slave(master_type, master_name, slave_type, slave_name)
             self.hw_up_dev(slave_name)
-
 
 
     def del_slave(self, master_type, master_name, slave_type, slave_name):

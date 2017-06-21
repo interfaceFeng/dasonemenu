@@ -183,7 +183,10 @@ def nmcli_make_slave(master_name, slave_name, slave_type, nmcli=NMCLICMD):
 
 
 def bond_list(bond_info_dir=BONDDIR):
-    return os.listdir(bond_info_dir)
+    try:
+        return os.listdir(bond_info_dir)
+    except:
+        return []
 
 
 def nmcli_show_dev(dev_name, nmcli=NMCLICMD, show_type='connection'):
