@@ -11,8 +11,6 @@ logging.basicConfig(filename = consts.LOGFILE,
                     format = "%(name)s %(asctime)s %(levelname)s %(message)s",
                     level = logging.DEBUG)
 
-import datetime
-import common.utils as utils
 import common.dialog as dialog
 import subprocess
 import modules as modules
@@ -20,11 +18,8 @@ from common.modulehelper import LanguageType
 
 
 
-import os
 import sys
-import signal
 import urwid
-import time
 import optparse
 
 import urwid.raw_display
@@ -52,8 +47,6 @@ class DASONESetUp(object):
         self.listbox = None
         self.frame = None
         self.mainloop = None
-        self.langtype = None
-        self.is_login = False
         self.main()
         self.choices = []
 
@@ -72,11 +65,6 @@ class DASONESetUp(object):
         return urwid.ListBox(urwid.SimpleListWalker(body))
 
     def menuitem_chosen(self, button, c):
-        if self.is_login is False :
-            if c != "Login":
-                self.menuitems.set_focus(2)
-                dialog.display_dialog(self.child, urwid.Text("Please login first"), "Illegal Operation")
-                return False
         size = self.screen.get_cols_rows()
         self.screen.draw_screen(size, self.frame.render(size))
         for item in self.menuitems.body.contents:
