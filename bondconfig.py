@@ -212,8 +212,15 @@ class DASONESetUp(object):
 
         # handle unexpected signal
         def handle_extra_input(key):
-            if key == 'f12':
-                raise urwid.ExitMainLoop()
+            if key == 'esc':
+                if self.mainloop.widget  == self.frame:
+                    if self.child.edit_open:
+                        self.child.handle_extra_input(key)
+                    else:
+                        confirm_exit_dialog = dialog.display_dialog(
+                            self.child, urwid.Text("Are you sure to exit configure your bond?"),
+                            "Exit", mod_callback=self.exit_program
+                        )
             if key == 'shift tab':
                 self.child.walker.tab_prev()
             if key == 'tab':

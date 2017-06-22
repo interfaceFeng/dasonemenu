@@ -53,10 +53,12 @@ class ModalDialog(urwid.WidgetWrap):
         # elif self.body_type == 'bool':
         #     self.mod_callback(True)
 
+
         urwid.emit_signal(self, "close")
 
         self.keep_open = False
         self.loop.widget = self.previous_widget
+        self.mod_callback(None)
 
     def __repr__(self):
         return "<%s title='%s' at %s>" % (self.__class__.__name__, self.title,
@@ -69,8 +71,6 @@ class ModalDialog(urwid.WidgetWrap):
             self.keep_open = False
             self.loop.widget = self.previous_widget
 
-        if key == 'f12':
-            self.original_mod.parent.exit_program(None)
 
 
 
