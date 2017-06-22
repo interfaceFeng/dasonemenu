@@ -52,25 +52,26 @@ class Bond(urwid.WidgetWrap):
                                self.eth_info_abstract_listbox]
 
         ## draw_fields with default info
-        self.fields = ['BOND_NAME', 'IP_ADDRESS', 'NET_MASK']
+        self.fields = ['BOND_NAME', 'BOND_MODE', 'IP_ADDRESS', 'NET_MASK']
         self.defaults = \
             {
                 "BOND_NAME" :{"label": "NAME",
                               "type": modulehelper.WidgetType.LABEL,
                               "tooltip": "Change your bond name here",
-                              "value": self.activebond_name},
+                              "value": ""},
                 "IP_ADDRESS": {"label": "ADDRESS",
                               "tooltip": "Manual configure IP address (example 192.168.1.2)",
-                              "value": self.bond_info[self.activebond_name]['ip4'][0]['address']
-                              if len(self.bond_list) > 0 and self.bond_info[self.activebond_name]['ip4']
-                              else ""},
+                              "value": ""},
                 "NET_MASK": {"label": "NETMASK",
                              "tooltip": "Manaual configure netmask (example 255.255.0.0)",
-                             "value": self.bond_info[self.activebond_name]['ip4'][0]['netmask']
-                             if len(self.bond_list) > 0 and self.bond_info[self.activebond_name]['ip4']
-                             else ""}
+                             "value": ""},
+                "BOND_MODE": {"label": "MODE",
+                              "type": modulehelper.WidgetType.LABEL_BUTTON,
+                              "callback": self.modify_bond_mode,
+                              "tooltip": "",
+                              "value": ""}
             }
-
+        self.update_bond_default()
 
 
     def bond_info_load(self):
@@ -121,6 +122,20 @@ class Bond(urwid.WidgetWrap):
             return wrapped_listbox
         else:
             return blank
+
+    def convert_mode_string_digit(self, alias):
+        mode_info_list = ['balance-rr', 'active-backup', 'balance-xor',
+                          'broadcast', '802.3ad', 'balance-tlb',
+                          'balance-alb']
+        if str.isdigit(alias):
+            return mode_info_list[alias]
+        else:
+            return mode_info_list.index(alias)
+
+    def modify_bond_mode(self, button):
+        msg = "Choose bond mode"
+
+
 
 
     def add_bond(self, button):
@@ -276,8 +291,8 @@ class Bond(urwid.WidgetWrap):
             self.bond_eth_inuse_tmp = copy.deepcopy(self.active_bond_eth_inuse)
             self.bond_eth_usable_tmp = copy.deepcopy(self.active_bond_eth_usable)
 
-        ip_addr = self.edits[1].original_widget.get_edit_text()
-        netmask = self.edits[2].original_widget.get_edit_text()
+        ip_addr = self.edits[2].original_widget.get_edit_text()
+        netmask = self.edits[3].original_widget.get_edit_text()
 
         bond_mode = self.bond_info[self.activebond_name]['mode']
         bond_master = self.bond_info[self.activebond_name]['master']
@@ -335,6 +350,12 @@ class Bond(urwid.WidgetWrap):
 
     def update_bond_default(self):
         self.defaults["BOND_NAME"]["value"] = self.activebond_name
+        if len(self.bond_list) > 0:
+            alias = self.bond_info[self.activebond_name]['mode']
+            mode = self.convert_mode_string_digit(alias)
+            self.defaults["BOND_MODE"]["value"] = mode
+        else:
+            self.defaults["BOND_MODE"]["value"] = ""
         if len(self.bond_list) > 0 and self.bond_info[self.activebond_name]['ip4']:
             self.defaults["IP_ADDRESS"]["value"] = self.bond_info[self.activebond_name]['ip4'][0]['address']
             self.defaults["NET_MASK"]["value"] = self.bond_info[self.activebond_name]['ip4'][0]['netmask']

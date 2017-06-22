@@ -27,7 +27,7 @@ def TextField(keyword, label, left_width, default_value=None, tooltip=None,
 
 def Button(text, callback=None, attr='buttn'):
     """Returns a wrapped Button with attributes buttn and buttnf."""
-    button = urwid.Button(text, callback)
+    button = DADONEButton(text, callback)
     return urwid.AttrMap(button, attr, 'reversed')
 
 
@@ -78,7 +78,7 @@ def ChoicesGroup(choices, default_value=None, fn=None):
 def TextWithButton(txt, button):
     """:returns a col widget which display as a text and button in a one-line Coloumn """
     text = urwid.Text(txt)
-    text_with_button = urwid.Columns([('weight', 1, text),
+    text_with_button = urwid.Columns([('fixed', 20, text),
                                       ('weight', 1, button)],
                                      dividechars=2)
     wrapped_text_with_button = urwid.AttrWrap(text_with_button, 'body')
@@ -171,6 +171,27 @@ class TextSelected(urwid.Button):
             self.toolbar.original_widget.set_text(self.tip)
         canv = super(TextSelected, self).render(size, focus)
         return canv
+
+# this is a button class whose label show at middle
+class DADONEButton(urwid.Button):
+    button_left = urwid.Text(" ")
+    button_right = urwid.Text(" ")
+
+    def __init__(self, label, on_press=None, user_data=None):
+        self._label = urwid.SelectableIcon("", 0)
+        cols = Columns([
+            ('weight', 1, self.button_left),
+            ('weight', 8, self._label),
+            ('weight', 1, self.button_right)],
+            dividechars=1)
+        super(urwid.Button, self).__init__(cols)
+
+        # The old way of listening for a change was to pass the callback
+        # in to the constructor.  Just convert it to the new way:
+        if on_press:
+            urwid.connect_signal(self, 'click', on_press, user_data)
+
+        self.set_label(label)
 
 
 # this a button class which ignore mouse click but callback when

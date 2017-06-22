@@ -75,6 +75,7 @@ class WidgetType(object):
     CHECKBOX = 4
     LIST = 5
     BUTTON = 6
+    LABEL_BUTTON = 7
 
 
 
@@ -93,14 +94,23 @@ class ModuleHelper(object):
 
     @classmethod
     def _create_button_widget(cls, default_data):
-        label = default_data.get('label')
-        callback = default_data.get('callback')
+        label = default_data.get('label', "")
+        callback = default_data.get('callback', "")
         button = urwidwrapper.Button(label, callback)
         return button
 
     @classmethod
     def _create_label_widget(cls, label, default_date):
         return urwid.Text([('important', label.ljust(20)), default_date])
+
+    @classmethod
+    def _create_label_button_widget(cls, default_data):
+        label = default_data.get('label', "")
+        callback = default_data.get('callback', None)
+        value = default_data.get('value', "")
+        button = urwidwrapper.Button(value, callback)
+        label_button = urwidwrapper.TextWithButton(label, button)
+        return label_button
 
     @classmethod
     def _create_widget(cls, key, default_data, toolbar):
@@ -125,6 +135,9 @@ class ModuleHelper(object):
                                           ispassword=ispassword)
         elif field_type == WidgetType.BUTTON:
             return cls._create_button_widget(default_data)
+
+        elif field_type == WidgetType.LABEL_BUTTON:
+            return cls._create_label_button_widget(default_data)
 
     @classmethod
     def _setup_widgets(cls, toolbar, fields, defaults):
