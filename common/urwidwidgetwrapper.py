@@ -25,9 +25,11 @@ def TextField(keyword, label, left_width, default_value=None, tooltip=None,
 
     return wrapped_obj
 
-def Button(text, callback=None, attr='buttn'):
+def Button(text, callback=None, attr='buttn', b_l=" ",
+           b_r=" ", ismiddle=True):
     """Returns a wrapped Button with attributes buttn and buttnf."""
-    button = DADONEButton(text, callback)
+    button = DADONEButton(text, callback, button_left=b_l,
+                          button_right=b_r, ismiddle=ismiddle)
     return urwid.AttrMap(button, attr, 'reversed')
 
 
@@ -77,10 +79,10 @@ def ChoicesGroup(choices, default_value=None, fn=None):
 
 def TextWithButton(txt, button):
     """:returns a col widget which display as a text and button in a one-line Coloumn """
-    text = urwid.Text(txt)
+    text = urwid.AttrMap(urwid.Text(txt), 'important')
     text_with_button = urwid.Columns([('fixed', 20, text),
                                       ('weight', 1, button)],
-                                     dividechars=2)
+                                     dividechars=0)
     wrapped_text_with_button = urwid.AttrWrap(text_with_button, 'body')
     # Bundle button and text so it can be used later easily
     wrapped_text_with_button.button = button
@@ -172,18 +174,25 @@ class TextSelected(urwid.Button):
         canv = super(TextSelected, self).render(size, focus)
         return canv
 
-# this is a button class whose label show at middle
+# this is a button class whose label show at middle or left
 class DADONEButton(urwid.Button):
-    button_left = urwid.Text(" ")
-    button_right = urwid.Text(" ")
-
-    def __init__(self, label, on_press=None, user_data=None):
+    def __init__(self, label, on_press=None, user_data=None,
+                 button_left=" ", button_right=" ", ismiddle=True):
+        self.button_left = urwid.Text(button_left)
+        self.button_right = urwid.Text(button_right)
         self._label = urwid.SelectableIcon("", 0)
-        cols = Columns([
-            ('weight', 1, self.button_left),
-            ('weight', 8, self._label),
-            ('weight', 1, self.button_right)],
-            dividechars=1)
+        if ismiddle:
+            cols = urwid.Columns([
+                ('weight', 1, self.button_left),
+                ('weight', 1, self._label),
+                ('weight', 1, self.button_right)],
+                dividechars=0)
+        else:
+            cols = urwid.Columns([
+                ('fixed', len(button_left), self.button_left),
+                self._label,
+                ('fixed', len(button_right), self.button_right)],
+                dividechars=1)
         super(urwid.Button, self).__init__(cols)
 
         # The old way of listening for a change was to pass the callback

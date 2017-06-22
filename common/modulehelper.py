@@ -26,8 +26,8 @@ class LanguageType(object):
     @classmethod
     def choose_language(cls, part, language=CHINESE,
                         language_field=None):
-        stringdir = "%s/bondconfig/strings" % \
-                     os.path.dirname(sys.path[0])
+        stringdir = "./strings"
+        log.debug(stringdir)
         log.debug(stringdir)
         language_tail = cls.tail.get(language, "_ch")
         stringsfile = stringdir + '/' + 'strings' + language_tail + '.yaml'
@@ -35,7 +35,6 @@ class LanguageType(object):
                                               part, language_tail)
 
         for key in language_field:
-            log.debug(strings)
             language_field[key] = strings[key]
 
         return language_field
@@ -108,7 +107,8 @@ class ModuleHelper(object):
         label = default_data.get('label', "")
         callback = default_data.get('callback', None)
         value = default_data.get('value', "")
-        button = urwidwrapper.Button(value, callback)
+        button = urwidwrapper.Button(value, callback,
+                                     b_l="", ismiddle=False)
         label_button = urwidwrapper.TextWithButton(label, button)
         return label_button
 

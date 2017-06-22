@@ -15,6 +15,10 @@ log = logging.getLogger('bond setup')
 blank = urwid.Divider(" ")
 
 class Bond(urwid.WidgetWrap):
+    mode_info_list = ['balance-rr', 'active-backup', 'balance-xor',
+                      'broadcast', '802.3ad', 'balance-tlb',
+                      'balance-alb']
+
     def __init__(self, parent, language=modulehelper.LanguageType.CHINESE):
         self.parent = parent
         self.screen = None
@@ -124,17 +128,39 @@ class Bond(urwid.WidgetWrap):
             return blank
 
     def convert_mode_string_digit(self, alias):
-        mode_info_list = ['balance-rr', 'active-backup', 'balance-xor',
-                          'broadcast', '802.3ad', 'balance-tlb',
-                          'balance-alb']
         if str.isdigit(alias):
-            return mode_info_list[alias]
+            return self.mode_info_list[int(alias)]
         else:
-            return mode_info_list.index(alias)
+            return self.mode_info_list.index(alias)
 
     def modify_bond_mode(self, button):
         msg = "Choose bond mode"
+        rgroup = []
+        content_body = [blank]
+        for radio_mode_index in range(0, len(self.mode_info_list)):
+            if button.get_label().split(":")[0] == str(radio_mode_index):
+                radio_mode_status = True
+            else:
+                log.debug(radio_mode_index)
+                radio_mode_status = False
+            radio_bond_piece = urwid.RadioButton(rgroup,
+                                                   "%s: %s"%(
+                                                       radio_mode_index,
+                                                       self.convert_mode_string_digit(str(radio_mode_index))
+                                                   ),
+                                                   radio_mode_status,
+                                                   self.modify_bond_mode_radiobutton_callback
+                                                   )
+            content_body.append(radio_bond_piece)
+        radio_mode_listbox = urwid.ListBox(widget.TabbedListWalker(content_body))
+        radio_mode_adapter = urwid.BoxAdapter(radio_mode_listbox, len(self.mode_info_list) + 1)
+        self.radio_mode_dialog = dialog.display_dialog(self, radio_mode_adapter, msg, confirm=False)
 
+    def modify_bond_mode_radiobutton_callback(self, radiobutton, args):
+        if args:
+            mode_value = radiobutton.get_label()
+            self.radio_mode_dialog.close(None)
+            self.edits[1].button.original_widget.set_label(mode_value)
 
 
 
@@ -294,7 +320,7 @@ class Bond(urwid.WidgetWrap):
         ip_addr = self.edits[2].original_widget.get_edit_text()
         netmask = self.edits[3].original_widget.get_edit_text()
 
-        bond_mode = self.bond_info[self.activebond_name]['mode']
+        bond_mode = self.edits[1].button.original_widget.get_label().split(":")[0]
         bond_master = self.bond_info[self.activebond_name]['master']
 
         # update IP info
@@ -321,7 +347,6 @@ class Bond(urwid.WidgetWrap):
         else:
             del bond_dic[self.activebond_name]['slave']
 
-        log.debug(bond_dic)
         response_bond = networkhelper.update_bond_info(bond_dic)
 
         if response_bond[0] is True:
@@ -353,7 +378,7 @@ class Bond(urwid.WidgetWrap):
         if len(self.bond_list) > 0:
             alias = self.bond_info[self.activebond_name]['mode']
             mode = self.convert_mode_string_digit(alias)
-            self.defaults["BOND_MODE"]["value"] = mode
+            self.defaults["BOND_MODE"]["value"] = "%s: %s"%(alias, mode)
         else:
             self.defaults["BOND_MODE"]["value"] = ""
         if len(self.bond_list) > 0 and self.bond_info[self.activebond_name]['ip4']:
@@ -369,7 +394,7 @@ class Bond(urwid.WidgetWrap):
             return
         # back button
         self.back_button = widget.Button('BACK', self.back_screen)
-        back_button_line = urwid.GridFlow([self.back_button], 8, 0, 0, 'left')
+        back_button_line = urwid.GridFlow([self.back_button], 12, 0, 0, 'left')
 
         ## draw a new screen with two lineboxes which used to
         ## configure net info and eths for bond
@@ -392,7 +417,7 @@ class Bond(urwid.WidgetWrap):
         # new screen
         self.eths_for_bond_height = len(self.active_bond_eth_inuse) + len(self.active_bond_eth_usable)
         screen_new_header = [back_button_line,
-                             urwid.BoxAdapter(net_info_linebox, 7),
+                             urwid.BoxAdapter(net_info_linebox, 8),
                              blank,
                              urwid.BoxAdapter(eths_for_bond_linebox, self.eths_for_bond_height + 6)]
         screen_new = modulehelper.ModuleHelper.screenUI(self, screen_new_header, [],
