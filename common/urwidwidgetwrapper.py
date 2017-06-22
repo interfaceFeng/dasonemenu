@@ -110,7 +110,7 @@ def ColContainTwoListBox(label_l, label_r,
     for index, txt_r in enumerate(text_list_r):
         if txt_r == focus_label:
             focus_row_col = index
-            focus_col = 2
+            focus_col = 1
         button_r = urwid.AttrWrap(ButtonNoClick(txt_r, callback_r), None, 'reversed')
         list_content_r.append(button_r)
 
@@ -119,26 +119,22 @@ def ColContainTwoListBox(label_l, label_r,
 
     if focus_col == 0:
         listbox_l.set_focus(focus_row_col)
-    elif focus_col == 2:
+    elif focus_col == 1:
         listbox_r.set_focus(focus_row_col)
 
     linebox_l = urwid.LineBox(listbox_l, label_l)
     linebox_r = urwid.LineBox(listbox_r, label_r)
 
 
-    list_mid = []
     height_max = len(text_list_l) + len(text_list_r) + 1
-    for i in range(0, height_max/2):
-        list_mid.append(urwid.Divider(" "))
-    list_mid.append(urwid.Text(" ->"))
-    listbox_mid = urwid.ListBox(urwid.SimpleListWalker(list_mid))
 
     if focus_col is None and len(text_list_l) > 0:
         focus_col = 0
     else:
-        focus_col = 2
-    col_two_listbox = urwid.Columns([('weight', 5, linebox_l), ('weight', 1, listbox_mid),
-                                     ('weight', 5, linebox_r)], focus_column=focus_col)
+        focus_col = 1
+    col_two_listbox = urwid.Columns([('weight', 5, linebox_l),
+                                     ('weight', 5, linebox_r)], focus_column=focus_col,
+                                    dividechars=2)
 
     wrapped_col_two_listbox = urwid.AttrWrap(urwid.BoxAdapter(col_two_listbox, height_max + 1), 'body')
 

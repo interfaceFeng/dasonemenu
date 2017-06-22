@@ -26,14 +26,12 @@ class LanguageType(object):
     @classmethod
     def choose_language(cls, part, language=CHINESE,
                         language_field=None):
-        stringdir = "./strings"
-        log.debug(stringdir)
-        log.debug(stringdir)
+        stringdir = "%s/strings"%sys.path[0]
         language_tail = cls.tail.get(language, "_ch")
         stringsfile = stringdir + '/' + 'strings' + language_tail + '.yaml'
         strings = cls._read_string_by_language(stringsfile,
                                               part, language_tail)
-
+        log.debug(strings)
         for key in language_field:
             language_field[key] = strings[key]
 
