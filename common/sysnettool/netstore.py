@@ -78,7 +78,7 @@ class BaseDev(object):
                           'gateway': self.check_ip4}
 
         for ip4 in ip4_list:
-            if 'address' not in ip4 or 'netmask'not in ip4:
+            if 'address' not in ip4 or 'netmask' not in ip4:
                 return False
 
             for ip4_property, value in ip4.items():
@@ -525,9 +525,10 @@ class NetInfo(object):
 
         # delete the eth that not exist in hardware
         for eth_name in remove_eths:
+            pass
             # nmclitool.nmcli_del_dev(eth_name)
-            self.dev_dict.del_dev(eth_type, eth_name)
-            self.hw_del_dev(eth_type, eth_name)
+            # self.dev_dict.del_dev(eth_type, eth_name)
+            # self.hw_del_dev(eth_type, eth_name)
 
         # add the eth that not exist in store
         for eth_name in add_eths:
@@ -547,8 +548,9 @@ class NetInfo(object):
 
 
                 except:
-                    self.hw_del_dev(eth_type, eth_name)
-                    self.hw_add_dev(eth_type, eth_name)
+                    pass
+                    # self.hw_del_dev(eth_type, eth_name)
+                    # self.hw_add_dev(eth_type, eth_name)
             # self.hw_del_dev('Eth', eth_name)
             # self.hw_add_dev('Eth', eth_name)
 
@@ -786,7 +788,10 @@ class NetInfo(object):
             for i, ip4_cidr in hw_info['IP4']['ADDRESS'].items():
                 if not ip4_cidr:
                     continue
-                ip4.append(ip4_cidr_2_netmask(ip4_cidr))
+                ip4_tmp = ip4_cidr_2_netmask(ip4_cidr)
+                if ip4_tmp:
+                    ip4.append(ip4_tmp)
+
             gateway = hw_info['IP4']['GATEWAY']
             if gateway and check_ip4(gateway):
                 ip4[0]['gateway'] = gateway
@@ -798,7 +803,6 @@ class NetInfo(object):
                 tmp_mode = bond_mode_convert(value)
                 if tmp_mode:
                     mode = tmp_mode
-                    break
 
         store_info = {'device': device,
                       'ip4': ip4,
