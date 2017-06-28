@@ -41,24 +41,23 @@ class ModalDialog(urwid.WidgetWrap):
         super(ModalDialog, self).__init__(overlay_attrmap)
 
     def close(self, arg):
-        # # if the dialog is editable, return edit msg to mod
-        # if self.body_type == 'edit':
-        #     self.mod_callback(self.body.get_edit_text())
-        #
-        # elif self.body_type == 'tworowlb':
-        #     self.mod_callback(self.body.list_content_l,
-        #                       self.body.list_content_r)
-        # # if the dialog is to remind user to check modify
-        # # return True
-        # elif self.body_type == 'bool':
-        #     self.mod_callback(True)
+        # if the dialog is editable, return edit msg to mod
+        if self.body_type == 'edit':
+            self.mod_callback(self.body.get_edit_text())
+
+        elif self.body_type == 'tworowlb':
+            self.mod_callback(self.body.list_content_l,
+                              self.body.list_content_r)
+        # if the dialog is to remind user to check modify
+        # return True
+        elif self.body_type == 'bool':
+            self.mod_callback(True)
 
 
         urwid.emit_signal(self, "close")
 
         self.keep_open = False
         self.loop.widget = self.previous_widget
-        self.mod_callback(None)
 
     def __repr__(self):
         return "<%s title='%s' at %s>" % (self.__class__.__name__, self.title,

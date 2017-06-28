@@ -219,7 +219,7 @@ class DASONESetUp(object):
                     else:
                         confirm_exit_dialog = dialog.display_dialog(
                             self.child, urwid.Text("Are you sure to exit configure your bond?"),
-                            "Exit", mod_callback=self.exit_program
+                            "Exit", body_type='bool', mod_callback=self.exit_program
                         )
             if key == 'shift tab':
                 self.child.walker.tab_prev()

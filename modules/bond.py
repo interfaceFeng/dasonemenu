@@ -141,7 +141,7 @@ class Bond(urwid.WidgetWrap):
             if button.get_label().split(":")[0] == str(radio_mode_index):
                 radio_mode_status = True
             else:
-                log.debug(radio_mode_index)
+                # log.debug(radio_mode_index)
                 radio_mode_status = False
             radio_bond_piece = urwid.RadioButton(rgroup,
                                                    "%s: %s"%(
