@@ -341,7 +341,7 @@ class DevDict(BaseDev):
 
 
 class BaseStore(object):
-    setting_file = './netsetting.yaml'
+    setting_file = '/etc/netsetting.yaml'
 
     def __init__(self, setting_file=None):
         if setting_file:
