@@ -341,7 +341,7 @@ class DevDict(BaseDev):
 
 
 class BaseStore(object):
-    setting_file = '/etc/netsetting.yaml'
+    setting_file = './netsetting.yaml'
 
     def __init__(self, setting_file=None):
         if setting_file:
@@ -659,6 +659,7 @@ class NetInfo(object):
 
         self.hw_del_dev(slave_type, slave_name)
         self.hw_add_dev(slave_type, slave_name)
+        self.hw_up_dev(slave_name)
         self.dev_dict.mod_dev(slave_type, slave_name, master='')
         self.dev_dict.mod_slave('del', master_type, master_name, slave_type, slave_name)
 
@@ -1021,7 +1022,7 @@ def bond_mode_convert(bond_mode_info):
 
 def check_cidr(cidr):
     try:
-        if 0 <= int(cidr) <= 24:
+        if 0 <= int(cidr) <= 32:
             return True
         else:
             return False

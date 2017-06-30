@@ -342,10 +342,9 @@ class Bond(urwid.WidgetWrap):
         inuse_set = set()
         for inuse in self.bond_eth_inuse_tmp:
             inuse_set.add(inuse)
-        if len(inuse_set) > 0:
-            bond_dic[self.activebond_name]['slave']['Eth'] = inuse_set
-        else:
-            del bond_dic[self.activebond_name]['slave']
+        bond_dic[self.activebond_name]['slave']['Eth'] = inuse_set
+        # else:
+        #     del bond_dic[self.activebond_name]['slave']
 
         response_bond = networkhelper.update_bond_info(bond_dic)
 
